@@ -90,19 +90,32 @@ This allows the LLM to:
 
 ### Installation
 
-**Requirements**: Python 3.8+
+**Requirements**
+- Python 3.8+
+- [uv](https://github.com/astral-sh/uv)
+    ```sh
+    # On macOS and Linux.
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # On Windows.
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    # With pip.
+    pip install uv
+    # Or pipx.
+    pipx install uv
+    ```
 
-```bash
-# Using uv (recommended)
+Install the project dependecies
+
+```sh
 uv add presidio-analyzer presidio-anonymizer spacy
 uv add https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
 ```
 
-please note: The used model download may take a few minutes.
+please note: The model download may take a few minutes.
 
 ### Run the Demo
 
-```bash
+```sh
 uv run main.py
 ```
 
@@ -543,14 +556,14 @@ guard.process_input("My email is jane@example.com")
 ### "No module named 'en_core_web_lg'"
 
 The spaCy model isn't installed. Run:
-```bash
+```sh
 uv add https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
 ```
 
 ### "OSError: [E050] Can't find model"
 
 Verify installation:
-```bash
+```sh
 python -c "import spacy; nlp = spacy.load('en_core_web_lg'); print('✓ Model loaded')"
 ```
 
