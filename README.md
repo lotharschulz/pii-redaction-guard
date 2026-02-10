@@ -53,7 +53,7 @@ This guard provides a **defense-in-depth approach**: sanitize inputs AND sweep o
          │                                │
          │  B) allow_restored_pii=True    │
          │     Keep known PII, redact new │
-         │     → "...to john.doe@...com" │
+         │     → "...to john.doe@...com"  │
          └────────────────────────────────┘
 ```
 
@@ -116,7 +116,341 @@ The demo shows **four scenarios**:
 **Sample Output:**
 
 ```
-TODO
+======================================================================
+Showcase: Presidio PII Guard
+======================================================================
+
+[User Input]
+Hi, my name is John Doe and my email is john.doe@example.com. My phone number is +1-555-123-4567. I'm working on project PRJ-20241234 and my employee ID is EMP-A12345. Please review the contract for client XYZ Corp.
+
+
+======================================================================
+DEMO 1: Default Mode (allow_restored_pii=False)
+======================================================================
+  [Presidio Input] Redacted 4 PII entities: ['PERSON', 'EMAIL_ADDRESS', 'PROJECT_CODE', 'EMPLOYEE_ID']
+
+[Sanitized for LLM]
+Hi, my name is <PERSON_1> and my email is <EMAIL_ADDRESS_1>. My phone number is +1-555-123-4567. I'm working on project <PROJECT_CODE_1> and my employee ID is <EMPLOYEE_ID_1>. Please review the contract for client XYZ Corp.
+
+[Simulated LLM Response]
+I've reviewed the details for project <PROJECT_CODE_1>. The contract looks good. I'll send a summary to <EMAIL_ADDRESS_1>.
+
+  [Presidio Output] Caught 4 PII entities in LLM output
+
+[Final Output to User]
+I've reviewed the details for project <PROJECT_CODE>. The contract looks good. I'll send a summary to <EMAIL>.
+
+
+[Audit Log - Demo 1]
+[
+  {
+    "stage": "input",
+    "detections_count": 4,
+    "entities_found": [
+      "EMAIL_ADDRESS",
+      "PROJECT_CODE",
+      "PERSON",
+      "EMPLOYEE_ID"
+    ],
+    "details": [
+      {
+        "entity_type": "PERSON",
+        "score": 0.85,
+        "start": 15,
+        "end": 23,
+        "placeholder": "<PERSON_1>",
+        "pii_hash": "6cea57c2fb6c"
+      },
+      {
+        "entity_type": "EMAIL_ADDRESS",
+        "score": 1.0,
+        "start": 40,
+        "end": 60,
+        "placeholder": "<EMAIL_ADDRESS_1>",
+        "pii_hash": "836f82db9912"
+      },
+      {
+        "entity_type": "PROJECT_CODE",
+        "score": 0.9,
+        "start": 121,
+        "end": 133,
+        "placeholder": "<PROJECT_CODE_1>",
+        "pii_hash": "46ec7c74ea38"
+      },
+      {
+        "entity_type": "EMPLOYEE_ID",
+        "score": 0.9,
+        "start": 156,
+        "end": 166,
+        "placeholder": "<EMPLOYEE_ID_1>",
+        "pii_hash": "9dff3fe7e6b6"
+      }
+    ]
+  },
+  {
+    "stage": "output_sweep",
+    "detections_count": 4,
+    "entities_found": [
+      "EMAIL_ADDRESS",
+      "PROJECT_CODE",
+      "URL"
+    ],
+    "details": [
+      {
+        "entity_type": "EMAIL_ADDRESS",
+        "score": 1.0,
+        "start": 100,
+        "end": 120
+      },
+      {
+        "entity_type": "PROJECT_CODE",
+        "score": 0.9,
+        "start": 38,
+        "end": 50
+      },
+      {
+        "entity_type": "URL",
+        "score": 0.5,
+        "start": 100,
+        "end": 107
+      },
+      {
+        "entity_type": "URL",
+        "score": 0.5,
+        "start": 109,
+        "end": 120
+      }
+    ]
+  }
+]
+
+======================================================================
+DEMO 2: Restored PII Mode (allow_restored_pii=True)
+======================================================================
+  [Presidio Input] Redacted 4 PII entities: ['PERSON', 'EMAIL_ADDRESS', 'PROJECT_CODE', 'EMPLOYEE_ID']
+
+[Sanitized for LLM]
+Hi, my name is <PERSON_1> and my email is <EMAIL_ADDRESS_1>. My phone number is +1-555-123-4567. I'm working on project <PROJECT_CODE_1> and my employee ID is <EMPLOYEE_ID_1>. Please review the contract for client XYZ Corp.
+
+[Simulated LLM Response]
+I've reviewed the details for project <PROJECT_CODE_1>. The contract looks good. I'll send a summary to <EMAIL_ADDRESS_1>.
+
+
+[Final Output to User]
+I've reviewed the details for project PRJ-20241234. The contract looks good. I'll send a summary to john.doe@example.com.
+
+Note: Original PII values restored in output only because they came from user input.
+
+[Audit Log - Demo 2]
+[
+  {
+    "stage": "input",
+    "detections_count": 4,
+    "entities_found": [
+      "EMAIL_ADDRESS",
+      "PROJECT_CODE",
+      "PERSON",
+      "EMPLOYEE_ID"
+    ],
+    "details": [
+      {
+        "entity_type": "PERSON",
+        "score": 0.85,
+        "start": 15,
+        "end": 23,
+        "placeholder": "<PERSON_1>",
+        "pii_hash": "6cea57c2fb6c"
+      },
+      {
+        "entity_type": "EMAIL_ADDRESS",
+        "score": 1.0,
+        "start": 40,
+        "end": 60,
+        "placeholder": "<EMAIL_ADDRESS_1>",
+        "pii_hash": "836f82db9912"
+      },
+      {
+        "entity_type": "PROJECT_CODE",
+        "score": 0.9,
+        "start": 121,
+        "end": 133,
+        "placeholder": "<PROJECT_CODE_1>",
+        "pii_hash": "46ec7c74ea38"
+      },
+      {
+        "entity_type": "EMPLOYEE_ID",
+        "score": 0.9,
+        "start": 156,
+        "end": 166,
+        "placeholder": "<EMPLOYEE_ID_1>",
+        "pii_hash": "9dff3fe7e6b6"
+      }
+    ]
+  }
+]
+
+======================================================================
+DEMO 3: Detecting Hallucinated PII
+======================================================================
+
+[State Management] Starting fresh session with reset guard...
+  [Presidio Input] Redacted 4 PII entities: ['PERSON', 'EMAIL_ADDRESS', 'PROJECT_CODE', 'EMPLOYEE_ID']
+
+[LLM Response with Hallucination]
+I've sent the summary to fake.person@newcorp.com and <EMAIL_ADDRESS_1>.
+
+  [Presidio Output] Caught 1 NEW PII entities (hallucinations)
+
+[Final Output]
+I've sent the summary to <EMAIL_ADDRESS> and john.doe@example.com.
+
+Note: Hallucinated email was caught and redacted!
+
+
+[Audit Log - Demo 3]
+[
+  {
+    "stage": "input",
+    "detections_count": 4,
+    "entities_found": [
+      "EMAIL_ADDRESS",
+      "PROJECT_CODE",
+      "PERSON",
+      "EMPLOYEE_ID"
+    ],
+    "details": [
+      {
+        "entity_type": "PERSON",
+        "score": 0.85,
+        "start": 15,
+        "end": 23,
+        "placeholder": "<PERSON_1>",
+        "pii_hash": "6cea57c2fb6c"
+      },
+      {
+        "entity_type": "EMAIL_ADDRESS",
+        "score": 1.0,
+        "start": 40,
+        "end": 60,
+        "placeholder": "<EMAIL_ADDRESS_1>",
+        "pii_hash": "836f82db9912"
+      },
+      {
+        "entity_type": "PROJECT_CODE",
+        "score": 0.9,
+        "start": 121,
+        "end": 133,
+        "placeholder": "<PROJECT_CODE_1>",
+        "pii_hash": "46ec7c74ea38"
+      },
+      {
+        "entity_type": "EMPLOYEE_ID",
+        "score": 0.9,
+        "start": 156,
+        "end": 166,
+        "placeholder": "<EMPLOYEE_ID_1>",
+        "pii_hash": "9dff3fe7e6b6"
+      }
+    ]
+  },
+  {
+    "stage": "output_sweep",
+    "detections_count": 1,
+    "entities_found": [
+      "EMAIL_ADDRESS"
+    ],
+    "details": [
+      {
+        "entity_type": "EMAIL_ADDRESS",
+        "score": 1.0,
+        "start": 25,
+        "end": 48
+      }
+    ]
+  }
+]
+
+======================================================================
+DEMO 4: State Management - Why reset() Matters
+======================================================================
+
+--- User 1's Session ---
+  [Presidio Input] Redacted 2 PII entities: ['EMAIL_ADDRESS', 'EMPLOYEE_ID']
+
+[Sanitized for LLM]
+My email is <EMAIL_ADDRESS_1> and my ID is <EMPLOYEE_ID_1>.
+
+[Simulated LLM Response]
+I've recorded your email <EMAIL_ADDRESS_1> and ID <EMPLOYEE_ID_1> in the system.
+
+
+[Final Output to User 1]
+I've recorded your email alice@company.com and ID EMP-B99999 in the system.
+
+
+----------------------------------------------------------------------
+   WITHOUT reset() - User 2's session (INSECURE)
+----------------------------------------------------------------------
+  [Presidio Input] Redacted 1 PII entities: ['EMAIL_ADDRESS']
+
+[Sanitized for LLM]
+My email is <EMAIL_ADDRESS_2>.
+
+[Simulated LLM Response]
+I've recorded your email <EMAIL_ADDRESS_2>.
+
+
+[Final Output to User 2]
+I've recorded your email bob@company.com.
+
+   PROBLEM: Mapping contains 3 items from BOTH users!
+   User 2 could potentially see User 1's PII if placeholders overlap!
+
+
+----------------------------------------------------------------------
+   WITH reset() - User 2's session (SECURE)
+----------------------------------------------------------------------
+[State Management] Called reset() - all mappings cleared
+
+  [Presidio Input] Redacted 1 PII entities: ['EMAIL_ADDRESS']
+
+[Sanitized for LLM]
+My email is <EMAIL_ADDRESS_1>.
+
+[Simulated LLM Response]
+I've recorded your email <EMAIL_ADDRESS_1>.
+
+
+[Final Output to User 2]
+I've recorded your email bob@company.com.
+
+   SECURE: Mapping contains 1 item(s) from only User 2
+   User 2's data is completely isolated from User 1's session!
+
+======================================================================
+Best Practice: Always call reset() between different users/conversations!
+======================================================================
+
+[Audit Log - Demo 4 (after reset)]
+[
+  {
+    "stage": "input",
+    "detections_count": 1,
+    "entities_found": [
+      "EMAIL_ADDRESS"
+    ],
+    "details": [
+      {
+        "entity_type": "EMAIL_ADDRESS",
+        "score": 1.0,
+        "start": 12,
+        "end": 27,
+        "placeholder": "<EMAIL_ADDRESS_1>",
+        "pii_hash": "045979b85581"
+      }
+    ]
+  }
+]
 ```
 
 ## Configuration
