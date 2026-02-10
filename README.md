@@ -86,25 +86,27 @@ This allows the LLM to:
 - ✅ **State Management**: Reset method for new conversations
 - ✅ **Multi-Language**: Supports additional languages via spaCy models
 
-## Quick Start
+# Quick Start
 
-### Installation
+## Installation
 
-**Requirements**
-- Python 3.8+
-- [uv](https://github.com/astral-sh/uv)
-    ```sh
-    # Installation on macOS and Linux.
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    # Installation on Windows.
-    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-    # Installation with pip.
-    pip install uv
-    # Installation with pipx.
-    pipx install uv
-    ```
+### Requirements
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv) - Fast Python package installer
 
-Install the project dependecies
+### Install uv
+```sh
+# Installation on macOS and Linux.
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Installation on Windows.
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# Installation with pip.
+pip install uv
+# Installation with pipx.
+pipx install uv
+```
+
+### Install Project Dependencies
 
 ```sh
 uv init
@@ -612,6 +614,22 @@ uv add https://github.com/explosion/spacy-models/releases/download/de_core_news_
 
 # German text
 guard_de = PresidioGuard(reversible=True, language="de")
+```
+
+## Development
+
+```sh
+# Install dev dependencies
+uv pip install -e ".[dev]"
+
+# Run linting
+uv run ruff check main.py
+
+# Format code
+uv run ruff format main.py
+
+# Type checking
+uv run mypy main.py
 ```
 
 ## Resources
