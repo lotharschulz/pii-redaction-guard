@@ -107,6 +107,8 @@ This allows the LLM to:
 Install the project dependecies
 
 ```sh
+uv init
+uv venv
 uv add presidio-analyzer presidio-anonymizer spacy
 uv add https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
 ```
@@ -160,10 +162,10 @@ I've reviewed the details for project <PROJECT_CODE>. The contract looks good. I
     "stage": "input",
     "detections_count": 4,
     "entities_found": [
-      "EMAIL_ADDRESS",
-      "PROJECT_CODE",
+      "EMPLOYEE_ID",
       "PERSON",
-      "EMPLOYEE_ID"
+      "PROJECT_CODE",
+      "EMAIL_ADDRESS"
     ],
     "details": [
       {
@@ -204,9 +206,9 @@ I've reviewed the details for project <PROJECT_CODE>. The contract looks good. I
     "stage": "output_sweep",
     "detections_count": 4,
     "entities_found": [
-      "EMAIL_ADDRESS",
+      "URL",
       "PROJECT_CODE",
-      "URL"
+      "EMAIL_ADDRESS"
     ],
     "details": [
       {
@@ -260,10 +262,10 @@ Note: Original PII values restored in output only because they came from user in
     "stage": "input",
     "detections_count": 4,
     "entities_found": [
-      "EMAIL_ADDRESS",
-      "PROJECT_CODE",
+      "EMPLOYEE_ID",
       "PERSON",
-      "EMPLOYEE_ID"
+      "PROJECT_CODE",
+      "EMAIL_ADDRESS"
     ],
     "details": [
       {
@@ -326,10 +328,10 @@ Note: Hallucinated email was caught and redacted!
     "stage": "input",
     "detections_count": 4,
     "entities_found": [
-      "EMAIL_ADDRESS",
-      "PROJECT_CODE",
+      "EMPLOYEE_ID",
       "PERSON",
-      "EMPLOYEE_ID"
+      "PROJECT_CODE",
+      "EMAIL_ADDRESS"
     ],
     "details": [
       {
