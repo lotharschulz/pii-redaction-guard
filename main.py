@@ -1,11 +1,14 @@
 """
-Presidio PII Redaction Guard
+Showcase: Presidio PII Redaction Guard 
+
 Handles both input sanitization (before LLM) and output sweeping (after LLM).
 Supports reversible anonymization so the LLM can reason about entities
 while real PII never leaves your perimeter.
-
-pip install presidio-analyzer presidio-anonymizer spacy
-python -m spacy download en_core_web_lg
+Key features:
+- Custom recognizers for org-specific PII (project codes, employee IDs, etc.)
+- Reversible anonymization with mapping for restoring original values
+- Final output sweep to catch any PII the LLM may have hallucinated
+- Audit logging of all detections (without storing actual PII)
 """
 
 from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
@@ -20,10 +23,7 @@ import json
 import hashlib
 
 
-# ---------------------------------------------------------------------------
-# 1. Custom recognizers — extend Presidio for domain-specific PII
-# ---------------------------------------------------------------------------
-
+# Custom recognizers — extend Presidio for domain-specific PII
 def build_custom_recognizers() -> List[PatternRecognizer]:
     """Add recognizers for org-specific identifiers."""
 
@@ -52,10 +52,7 @@ def build_custom_recognizers() -> List[PatternRecognizer]:
     return [project_code, employee_id, german_tax_id]
 
 
-# ---------------------------------------------------------------------------
-# 2. Analyzer setup
-# ---------------------------------------------------------------------------
-
+# Analyzer setup
 def create_analyzer() -> AnalyzerEngine:
     analyzer = AnalyzerEngine()
     for recognizer in build_custom_recognizers():
@@ -63,10 +60,7 @@ def create_analyzer() -> AnalyzerEngine:
     return analyzer
 
 
-# ---------------------------------------------------------------------------
-# 3. Reversible anonymization (encrypt-style with mapping)
-# ---------------------------------------------------------------------------
-
+# Reversible anonymization (encrypt-style with mapping)
 class ReversibleAnonymizer:
     """
     Replaces PII with deterministic placeholders and keeps a mapping
@@ -82,7 +76,6 @@ class ReversibleAnonymizer:
         self._counters: Dict[str, int] = {}
 
     def _placeholder(self, entity_type: str, original: str) -> str:
-        """Generate a stable, deterministic placeholder."""
         if original in self._reverse:
             return self._reverse[original]
         count = self._counters.get(entity_type, 0) + 1
@@ -92,11 +85,34 @@ class ReversibleAnonymizer:
         self._reverse[original] = placeholder
         return placeholder
 
+    def _deduplicate_results(self, results):
+        """Remove overlapping entities, keeping the one with the highest score."""
+        if not results:
+            return results
+        
+        # Sort by start position, then by score (descending)
+        sorted_results = sorted(results, key=lambda r: (r.start, -r.score))
+        
+        deduplicated = []
+        for result in sorted_results:
+            # Check if this result overlaps with any already accepted result
+            overlaps = False
+            for accepted in deduplicated:
+                # Check for overlap
+                if not (result.end <= accepted.start or result.start >= accepted.end):
+                    overlaps = True
+                    break
+            
+            if not overlaps:
+                deduplicated.append(result)
+        
+        return deduplicated
+
     def anonymize(
         self,
         text: str,
         language: str = "en",
-        score_threshold: float = 0.4,
+        score_threshold: float = 0.7,
         entities: List[str] = None,
     ) -> Tuple[str, List[dict]]:
         """
@@ -113,15 +129,24 @@ class ReversibleAnonymizer:
             entities=entities,
         )
 
-        # Sort by start position descending so replacements don't shift indices
-        results = sorted(results, key=lambda r: r.start, reverse=True)
+        # Deduplicate overlapping entities - keep highest scoring one
+        results = self._deduplicate_results(results)
 
-        anonymized = text
+        # Sort by start position ascending to build string from left to right
+        results = sorted(results, key=lambda r: r.start)
+
+        anonymized = ""
+        last_end = 0
         detections = []
 
         for result in results:
+            # Add text before this entity
+            anonymized += text[last_end : result.start]
+            
+            # Replace entity with placeholder
             original = text[result.start : result.end]
             placeholder = self._placeholder(result.entity_type, original)
+            anonymized += placeholder
 
             # Build audit record (no actual PII stored — just metadata)
             detections.append(
@@ -136,7 +161,10 @@ class ReversibleAnonymizer:
                 }
             )
 
-            anonymized = anonymized[: result.start] + placeholder + anonymized[result.end :]
+            last_end = result.end
+
+        # Add remaining text after the last entity
+        anonymized += text[last_end:]
 
         return anonymized, detections
 
@@ -152,10 +180,7 @@ class ReversibleAnonymizer:
         return dict(self._mapping)
 
 
-# ---------------------------------------------------------------------------
-# 4. Standalone functions for simple (non-reversible) redaction
-# ---------------------------------------------------------------------------
-
+# Standalone functions for simple (non-reversible) redaction
 def redact_pii(text: str, language: str = "en") -> Tuple[str, List[dict]]:
     """
     Simple one-shot PII redaction (non-reversible).
@@ -195,10 +220,7 @@ def redact_pii(text: str, language: str = "en") -> Tuple[str, List[dict]]:
     return anonymized.text, detections
 
 
-# ---------------------------------------------------------------------------
-# 5. Guard class for pipeline integration
-# ---------------------------------------------------------------------------
-
+# Guard class for pipeline integration
 class PresidioGuard:
     """
     Drop-in guard for the LLM pipeline.
@@ -274,23 +296,20 @@ class PresidioGuard:
         return self._audit_log
 
 
-# ---------------------------------------------------------------------------
-# 6. Demo / Usage
-# ---------------------------------------------------------------------------
-
+# Demo / Usage
 if __name__ == "__main__":
     print("=" * 70)
-    print("DEMO: Presidio PII Guard")
+    print("Showcase: Presidio PII Guard")
     print("=" * 70)
 
-    guard = PresidioGuard(reversible=True)
+    guard = PresidioGuard(reversible=True, language="en")
 
     # Simulate user input with PII
     user_input = (
-        "Hi, my name is Max Mustermann and my email is max@example.com. "
-        "My phone number is +49 170 1234567. "
+        "Hi, my name is John Doe and my email is john.doe@example.com. "
+        "My phone number is +44 1234567. "
         "I'm working on project PRJ-20241234 and my employee ID is EMP-A12345. "
-        "Please review the contract for client ACME Corp."
+        "Please review the contract for client XYZ Corp."
     )
 
     print(f"\n[User Input]\n{user_input}\n")
