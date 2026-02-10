@@ -1,8 +1,6 @@
 # Showcase: Presidio PII Redaction Guard
 
-**Protect sensitive data when using LLMs** — redacts PII before LLM processing and sweeps output to catch any leaked or hallucinated data.
-
-Uses [Microsoft Presidio](https://microsoft.github.io/presidio/) for PII detection and anonymization.
+**Protect sensitive data when using LLMs** — redacts PII before LLM processing and sweeps output to catch leaked or hallucinated data.
 
 ## Why This Matters
 
@@ -15,6 +13,8 @@ When integrating LLMs into applications handling sensitive data (healthcare, fin
 This guard provides a **defense-in-depth approach**: sanitize inputs AND sweep outputs.
 
 ## How It Works
+
+### Architecture Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -34,22 +34,57 @@ This guard provides a **defense-in-depth approach**: sanitize inputs AND sweep o
 │ LLM Response: "I'll send a summary to <EMAIL_ADDRESS_1>"        │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
-                    [OUTPUT SWEEP]
-                    Catch any new/leaked PII
+           [DEANONYMIZATION] (if reversible=True)
+           Restore: <EMAIL_ADDRESS_1> → john.doe@example.com
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ To User: "I'll send a summary to <EMAIL>"                       │
+│ Deanonymized: "I'll send a summary to john.doe@example.com"     │
 └─────────────────────────────────────────────────────────────────┘
+                              ↓
+              [OUTPUT SWEEP] (if enabled)
+              Check for PII in output
+                              ↓
+         ┌────────────────────────────────┐
+         │  Two policies available:       │
+         │                                │
+         │  A) allow_restored_pii=False   │
+         │     Re-redact everything       │
+         │     → "...to <EMAIL>"          │
+         │                                │
+         │  B) allow_restored_pii=True    │
+         │     Keep known PII, redact new │
+         │     → "...to john.doe@...com" │
+         └────────────────────────────────┘
 ```
+
+### Understanding Reversible Mode
+
+**Reversible mode** maintains a mapping between placeholders and original values:
+- `<EMAIL_ADDRESS_1>` ↔ `john.doe@example.com`
+- `<PERSON_1>` ↔ `John Doe`
+
+This allows the LLM to:
+✅ Reason about entities using consistent references  
+✅ Process requests without seeing actual PII  
+✅ Return responses that reference the same entities
+
+**After the LLM responds**, you can:
+- **Restore original values** so users see their real data
+- **Sweep for new PII** to catch anything the LLM hallucinated
+- **Choose your policy**: Allow restored PII or re-redact everything
 
 ## Features
 
-- **Dual Protection**: Input sanitization + output sweeping
-- **Anonymization for LLM reasoning**: LLM sees placeholders only, also identified PII data are not leaked in output.
-- **Custom Recognizers**: Extend detection for org-specific patterns (project codes, employee IDs, etc.)
-- **Built-in Detectors**: Email, phone, credit card, IBAN, names, locations, and more
-- **Audit Logging**: Track all detections with hashed PII (not actual values) for compliance
-- **Multi-Language**: Supports additional languages via spaCy models
+- ✅ **Input Sanitization**: Removes PII before sending to LLM
+- ✅ **Reversible Anonymization**: Maintains mappings to restore original values
+- ✅ **Output Restoration**: Optionally restore user's PII in final output
+- ✅ **Hallucination Detection**: Catches NEW PII the LLM might generate
+- ✅ **Flexibility**: Choose between safety (re-redact all) or usability (show restored PII)
+- ✅ **Custom Recognizers**: Extend detection for org-specific patterns (project codes, employee IDs)
+- ✅ **Built-in Detectors**: Email, phone, credit card, IBAN, names, locations, and more
+- ✅ **Audit Logging**: Track all detections with hashed PII (not actual values) for compliance
+- ✅ **State Management**: Reset method for new conversations
+- ✅ **Multi-Language**: Supports additional languages via spaCy models
 
 ## Quick Start
 
@@ -71,122 +106,103 @@ please note: The used model download may take a few minutes.
 uv run main.py
 ```
 
-**Expected Output**:
+The demo shows **four scenarios**:
+
+1. **Default Mode** (`allow_restored_pii=False`): Safest - all PII redacted in output
+2. **Restored PII Mode** (`allow_restored_pii=True`): Users see their original data
+3. **Hallucination Detection**: Catches NEW PII the LLM generates
+4. **State Management**: Demonstrates proper use of `reset()` between users/sessions
+
+**Sample Output:**
 
 ```
-======================================================================
-Showcase: Presidio PII Guard
-======================================================================
-
-[User Input]
-Hi, my name is John Doe and my email is john.doe@example.com. My phone number is +44 1234567. I'm working on project PRJ-20241234 and my employee ID is EMP-A12345. Please review the contract for client XYZ Corp.
-
-  [Presidio Input] Redacted 5 PII entities: ['PERSON', 'EMAIL_ADDRESS', 'DATE_TIME', 'PROJECT_CODE', 'EMPLOYEE_ID']
-
-[Sanitized for LLM]
-Hi, my name is <PERSON_1> and my email is <EMAIL_ADDRESS_1>. My phone number is <DATE_TIME_1>. I'm working on project <PROJECT_CODE_1> and my employee ID is <EMPLOYEE_ID_1>. Please review the contract for client XYZ Corp.
-
-[Simulated LLM Response]
-I've reviewed the details for project <PROJECT_CODE_1>. The contract looks good. I'll send a summary to <EMAIL_ADDRESS_1>.
-
-  [Presidio Output] Caught 4 PII entities in LLM output
-
-[Final Output to User]
-I've reviewed the details for project <PROJECT_CODE>. The contract looks good. I'll send a summary to <EMAIL>.
-
-
-[Audit Log]
-[
-  {
-    "stage": "input",
-    "detections_count": 5,
-    "entities_found": [
-      "PERSON",
-      "EMAIL_ADDRESS",
-      "PROJECT_CODE",
-      "EMPLOYEE_ID",
-      "DATE_TIME"
-    ],
-    "details": [
-      {
-        "entity_type": "PERSON",
-        "score": 0.85,
-        "start": 15,
-        "end": 23,
-        "placeholder": "<PERSON_1>",
-        "pii_hash": "6cea57c2fb6c"
-      },
-      {
-        "entity_type": "EMAIL_ADDRESS",
-        "score": 1.0,
-        "start": 40,
-        "end": 60,
-        "placeholder": "<EMAIL_ADDRESS_1>",
-        "pii_hash": "836f82db9912"
-      },
-      {
-        "entity_type": "DATE_TIME",
-        "score": 0.85,
-        "start": 81,
-        "end": 92,
-        "placeholder": "<DATE_TIME_1>",
-        "pii_hash": "eb3b54730a61"
-      },
-      {
-        "entity_type": "PROJECT_CODE",
-        "score": 0.9,
-        "start": 117,
-        "end": 129,
-        "placeholder": "<PROJECT_CODE_1>",
-        "pii_hash": "46ec7c74ea38"
-      },
-      {
-        "entity_type": "EMPLOYEE_ID",
-        "score": 0.9,
-        "start": 152,
-        "end": 162,
-        "placeholder": "<EMPLOYEE_ID_1>",
-        "pii_hash": "9dff3fe7e6b6"
-      }
-    ]
-  },
-  {
-    "stage": "output_sweep",
-    "detections_count": 4,
-    "entities_found": [
-      "EMAIL_ADDRESS",
-      "URL",
-      "PROJECT_CODE"
-    ],
-    "details": [
-      {
-        "entity_type": "EMAIL_ADDRESS",
-        "score": 1.0,
-        "start": 100,
-        "end": 120
-      },
-      {
-        "entity_type": "PROJECT_CODE",
-        "score": 0.9,
-        "start": 38,
-        "end": 50
-      },
-      {
-        "entity_type": "URL",
-        "score": 0.5,
-        "start": 100,
-        "end": 107
-      },
-      {
-        "entity_type": "URL",
-        "score": 0.5,
-        "start": 109,
-        "end": 120
-      }
-    ]
-  }
-]
+TODO
 ```
+
+## Configuration
+
+### Basic Usage
+
+```python
+from main import PresidioGuard
+
+# Default: Safest mode - no PII in output
+guard = PresidioGuard()
+
+# Allow users to see their original data
+guard = PresidioGuard(allow_restored_pii=True)
+
+# Disable output sweep entirely (not recommended)
+guard = PresidioGuard(sweep_for_hallucinations=False)
+```
+
+### All Configuration Options
+
+```python
+guard = PresidioGuard(
+    reversible=True,                    # Maintain PII mappings
+    language="en",                      # Language for detection
+    input_threshold=0.7,                # Input detection confidence (0.0-1.0)
+    output_threshold=0.7,               # Output detection confidence
+    allow_restored_pii=False,           # Allow original PII in output
+    sweep_for_hallucinations=True,      # Check output for new PII
+)
+```
+
+### Parameter Guide
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `reversible` | `True` | Maintain mappings between placeholders and original values |
+| `language` | `"en"` | Language code for spaCy model |
+| `input_threshold` | `0.7` | Confidence threshold for input detection (higher = fewer false positives) |
+| `output_threshold` | `0.7` | Confidence threshold for output sweep |
+| `allow_restored_pii` | `False` | If `True`, allows known PII in output; if `False`, re-redacts everything |
+| `sweep_for_hallucinations` | `True` | Check LLM output for PII |
+
+### Use Case Recommendations
+
+**Maximum Security** (external LLM, compliance-critical):
+```python
+guard = PresidioGuard(
+    allow_restored_pii=False,
+    input_threshold=0.6,  # Catch more PII
+)
+```
+
+**Good User Experience** (internal tools, manageable risk):
+```python
+guard = PresidioGuard(
+    allow_restored_pii=True,
+    sweep_for_hallucinations=True,  # Still catch hallucinations
+)
+```
+
+**Local Models** (no external API):
+```python
+guard = PresidioGuard(
+    allow_restored_pii=True,
+    sweep_for_hallucinations=False,  # Trust your local model
+)
+```
+
+### State Management
+
+```python
+guard = PresidioGuard()
+
+# Process conversation 1
+guard.process_input("My email is john@example.com")
+# ... LLM interaction ...
+
+# Clear state before conversation 2
+guard.reset()
+
+# Process conversation 2
+guard.process_input("My email is jane@example.com")
+```
+
+**Important note**: Always call `reset()` between users or conversations to prevent PII leakage.
 
 ## Troubleshooting
 
@@ -206,20 +222,41 @@ python -c "import spacy; nlp = spacy.load('en_core_web_lg'); print('✓ Model lo
 
 ### Low Detection Accuracy
 
-- Lower `score_threshold` (e.g., 0.6) to catch more entities
+- Lower `input_threshold` (e.g., 0.5) to catch more entities
 - Add context keywords to custom recognizers
 - Use a larger spaCy model (already using `lg` in this demo)
 
 ### High False Positives
 
-- Raise `score_threshold` (e.g., 0.8)
+- Raise `input_threshold` (e.g., 0.8)
 - Add negative patterns or allowlists
 - Review and remove overly broad custom recognizers
 
+### Phone Numbers Detected as DATE_TIME
+
+Short phone numbers like `+44 1234567` may be misclassified. Solutions:
+- Use properly formatted numbers: `+1-555-123-4567`
+- Add custom PHONE_NUMBER recognizer with stricter patterns
+- Filter out DATE_TIME detections with low confidence
+
+### Output Still Showing Placeholders
+
+If you see `<EMAIL>` instead of `john@example.com`:
+- Set `allow_restored_pii=True`
+- Or disable output sweep: `sweep_for_hallucinations=False`
+
+### Memory/State Issues
+
+- Call `guard.reset()` between conversations
+- Don't reuse guard instances across users
+- Monitor `_mapping` size in long-running applications
+
 ## Multi-Language Support
 
+Please see [Presidio language support](https://microsoft.github.io/presidio/analyzer/languages/) for details.
+
 ```python
-# please note: I did not test this and share this based on my docs understanding
+# please note: I did not test the code below and share this based on my documentation understanding
 
 # Install German model first:
 uv add https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl
@@ -227,8 +264,6 @@ uv add https://github.com/explosion/spacy-models/releases/download/de_core_news_
 # German text
 guard_de = PresidioGuard(reversible=True, language="de")
 ```
-
-See [Presidio language support](https://microsoft.github.io/presidio/analyzer/languages/) for details.
 
 ## Resources
 
