@@ -94,13 +94,13 @@ This allows the LLM to:
 - Python 3.8+
 - [uv](https://github.com/astral-sh/uv)
     ```sh
-    # On macOS and Linux.
+    # Installation on macOS and Linux.
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    # On Windows.
+    # Installation on Windows.
     powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-    # With pip.
+    # Installation with pip.
     pip install uv
-    # Or pipx.
+    # Installation with pipx.
     pipx install uv
     ```
 
