@@ -26,16 +26,7 @@ def build_custom_recognizers() -> list[PatternRecognizer]:
         patterns=[Pattern("employee_id", r"\bEMP-[A-Z]\d{5}\b", 0.9)],
     )
 
-    # Example: German tax IDs (Steuer-ID) — 11-digit number
-    # not used below by purpose because input may contain dates that match this pattern
-    german_tax_id = PatternRecognizer(
-        supported_entity="DE_TAX_ID",
-        name="german_tax_id_recognizer",
-        patterns=[Pattern("de_tax_id", r"\b\d{11}\b", 0.4)],
-        context=["steuer", "tax", "finanzamt", "steuernummer"],
-    )
-
-    return [project_code, employee_id, german_tax_id]
+    return [project_code, employee_id]
 
 
 # Analyzer setup
@@ -188,8 +179,7 @@ def redact_pii(text: str, language: str = "en") -> tuple[str, list[dict]]:
             "CREDIT_CARD": OperatorConfig("replace", {"new_value": "<CREDIT_CARD>"}),
             "IBAN_CODE": OperatorConfig("replace", {"new_value": "<IBAN>"}),
             "PROJECT_CODE": OperatorConfig("replace", {"new_value": "<PROJECT_CODE>"}),
-            "EMPLOYEE_ID": OperatorConfig("replace", {"new_value": "<EMPLOYEE_ID>"}),
-            "DE_TAX_ID": OperatorConfig("replace", {"new_value": "<DE_TAX_ID>"}),
+            "EMPLOYEE_ID": OperatorConfig("replace", {"new_value": "<EMPLOYEE_ID>"})
         },
     )
 
